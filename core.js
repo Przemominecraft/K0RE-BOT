@@ -18,12 +18,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const TOKEN = process.env.DISCORD_TOKEN;
-const GUILD_ID = '1465447308111118520'; 
+const GUILD_ID = '1476957231034663153'; 
 
 // --- WPISZ TUTAJ SWOJE ID KATEGORII ---
-const CAT_FREE = 'ID_KATEGORII_DARMOWE';
-const CAT_PAID = 'ID_KATEGORII_PLATNE';
-const CAT_OTHER = 'ID_KATEGORII_INNE';
+const CAT_FREE = '1476992445337178162';
+const CAT_PAID = '1476992482259763392';
+const CAT_OTHER = '1476992518108217385';
 
 const client = new Client({ 
     intents: [
