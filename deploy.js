@@ -17,7 +17,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         console.log('Odświeżanie komend Slash...');
         await rest.put(
-            Routes.applicationCommands('TWOJE_ID_BOTA'), 
+            Routes.applicationCommands('1476933815057518737'), 
             { body: commands },
         );
         console.log('✅ Komendy zarejestrowane!');
