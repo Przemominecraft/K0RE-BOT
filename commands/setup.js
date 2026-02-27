@@ -1,32 +1,27 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('setup')
-        .setDescription('Wysyła profesjonalny panel ticketów K0re SHOP'),
+        .setDescription('Ustawia panel ticketów na kanale')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator), // Tylko dla admina
     async execute(interaction) {
         const embed = new EmbedBuilder()
-            .setTitle('❄️ CENTRUM POMOCY K0RE SHOP')
-            .setDescription(
-                'Witaj w oficjalnym systemie wsparcia **K0re SHOP**! 🧊\n\n' +
-                'Wybierz odpowiednią kategorię poniżej, aby otworzyć ticket.\n\n' +
-                '📌 **Informacje:**\n' +
-                '• **Płatne acc:** Przygotuj kod PSC (PLN).\n' +
-                '• **Brak zwrotów:** Kupując u nas, akceptujesz tę zasadę.\n' +
-                '• **Cierpliwość:** Każda sprawa zostanie rozpatrzona! ✅'
-            )
-            .setColor('#3498db')
-            .setThumbnail(interaction.guild.iconURL())
-            .setFooter({ text: 'K0re SHOP • Najlepsze konta na rynku' })
-            .setTimestamp();
+            .setTitle('🎫 SYSTEM TICKETÓW | K0RE SHOP')
+            .setDescription('Kliknij przycisk poniżej, aby otworzyć ticket i skontaktować się z administracją.\n\n**Kategorie:**\n• Zakup kont\n• Zapytanie techniczne\n• Współpraca')
+            .setColor(3447003) // Niebieski
+            .setFooter({ text: 'K0re shop • Czas odpowiedzi: do 24h' });
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('t_free').setLabel('Darmowe acc').setEmoji('🎁').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId('t_paid').setLabel('Płatne acc').setEmoji('💎').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId('t_other').setLabel('Inne').setEmoji('⚙️').setStyle(ButtonStyle.Secondary)
-        );
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('open_ticket')
+                    .setLabel('Otwórz Ticket')
+                    .setEmoji('📩')
+                    .setStyle(ButtonStyle.Primary),
+            );
 
+        await interaction.reply({ content: 'Panel ticketów został wysłany!', ephemeral: true });
         await interaction.channel.send({ embeds: [embed], components: [row] });
-        await interaction.reply({ content: '✅ Panel wysłany!', ephemeral: true });
     },
 };
