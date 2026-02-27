@@ -15,13 +15,17 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
     try {
-        console.log('Odświeżanie komend Slash...');
+        console.log('🚀 Rozpoczynam odświeżanie komend Slash dla K0re SHOP...');
+        
         await rest.put(
+            // TWOJE NOWE APP ID
             Routes.applicationCommands('1476933815057518737'), 
             { body: commands },
         );
-        console.log('✅ Komendy zarejestrowane!');
+
+        console.log('✅ Sukces! Komendy zostały zarejestrowane w API Discorda.');
+        console.log('💡 Jeśli ich nie widzisz, zrestartuj aplikację Discorda (Ctrl + R).');
     } catch (error) {
-        console.error(error);
+        console.error('❌ Błąd podczas rejestracji komend:', error);
     }
 })();
