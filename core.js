@@ -18,7 +18,7 @@ const {
 const fs = require('node:fs');
 const path = require('node:path');
 
-// 1. KONFIGURACJA
+// 1. USTAWIENIA (Pamiętaj o Variables na Railway!)
 const token = process.env.TOKEN;
 const clientId = process.env.CLIENT_ID;
 const STAFF_ROLE_ID = process.env.STAFF_ROLE_ID;
@@ -31,7 +31,7 @@ const client = new Client({
     ] 
 });
 
-// Konfiguracja kategorii ticketów
+// Konfiguracja Twoich kategorii
 const TICKET_CONFIG = {
     'ticket_free_ac': { label: 'Darmowe AC', prefix: 'free', categoryId: '1476992445337178162' },
     'ticket_paid_ac': { label: 'Płatne AC', prefix: 'paid', categoryId: '1476992482259763392' },
@@ -46,8 +46,7 @@ const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
     const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
     for (const file of commandFiles) {
-        const filePath = path.join(commandsPath, file);
-        const command = require(filePath);
+        const command = require(path.join(commandsPath, file));
         if ('data' in command && 'execute' in command) {
             client.commands.set(command.data.name, command);
             commands.push(command.data.toJSON());
@@ -59,7 +58,6 @@ if (fs.existsSync(commandsPath)) {
 const rest = new REST({ version: '10' }).setToken(token);
 (async () => {
     try {
-        console.log('🚀 Odświeżanie komend slash...');
         await rest.put(Routes.applicationCommands(clientId), { body: commands });
         console.log('✅ Komendy zarejestrowane!');
     } catch (error) {
@@ -67,32 +65,36 @@ const rest = new REST({ version: '10' }).setToken(token);
     }
 })();
 
-// 4. EVENT: START BOTA
 client.once('clientReady', (c) => {
     console.log(`✅ K0re SHOP Bot Online! Zalogowano jako: ${c.user.tag}`);
 });
 
-// 5. OBSŁUGA INTERAKCJI
+// 4. OBSŁUGA INTERAKCJI
 client.on('interactionCreate', async (interaction) => {
     
     // --- KOMENDY SLASH ---
     if (interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
-        if (!command) return;
-        try {
-            await command.execute(interaction);
-        } catch (error) {
-            console.error(error);
-            await interaction.reply({ content: 'Błąd podczas wykonywania komendy!', ephemeral: true });
-        }
+        if (command) await command.execute(interaction).catch(console.error);
     }
 
     // --- PRZYCISKI ---
     if (interaction.isButton()) {
         
-        // A. OTWIERANIE TICKETA
+        // A. OTWIERANIE TICKETA (Z BLOKADĄ DO 1 SZTUKI)
         if (TICKET_CONFIG[interaction.customId]) {
             await interaction.deferReply({ ephemeral: true });
+
+            // Sprawdzanie czy użytkownik ma już otwarty kanał z jednym z przedrostków
+            const existingTicket = interaction.guild.channels.cache.find(ch => 
+                ch.name.includes(interaction.user.username.toLowerCase()) && 
+                Object.values(TICKET_CONFIG).some(cfg => ch.name.startsWith(cfg.prefix))
+            );
+
+            if (existingTicket) {
+                return interaction.editReply({ content: `❌ Masz już otwarty ticket! Przejdź tutaj: ${existingTicket}` });
+            }
+
             const selected = TICKET_CONFIG[interaction.customId];
 
             try {
@@ -111,7 +113,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setTitle('🛡️ K0re Support - Discord')
                     .setDescription(`Witaj ${interaction.user}!\n\n**Wybrana kategoria:**\n${selected.label}\n\n**Status:** ⏳ Oczekiwanie na administrację...`)
                     .setColor('#2ecc71')
-                    .setFooter({ text: `K0re SHOP • Dziś o ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` });
+                    .setFooter({ text: `K0re SHOP • ${new Date().toLocaleTimeString()}` });
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId('ticket_claim').setLabel('Przejmij').setEmoji('📜').setStyle(ButtonStyle.Success),
@@ -122,7 +124,7 @@ client.on('interactionCreate', async (interaction) => {
                 await interaction.editReply({ content: `✅ Twój ticket został utworzony: ${channel}` });
             } catch (err) {
                 console.error(err);
-                await interaction.editReply({ content: '❌ Błąd podczas tworzenia kanału. Sprawdź uprawnienia bota!' });
+                await interaction.editReply({ content: '❌ Błąd tworzenia kanału. Sprawdź uprawnienia bota!' });
             }
         }
 
@@ -134,60 +136,47 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: `✅ Ticket przejęty przez: ${interaction.user}` });
         }
 
-        // C. OTWIERANIE OKNA ZAMYKANIA (MODAL)
+        // C. OKNO ZAMYKANIA
         if (interaction.customId === 'ticket_close_modal') {
             if (!interaction.member.roles.cache.has(STAFF_ROLE_ID)) {
                 return interaction.reply({ content: 'Tylko staff może zamknąć ticket!', ephemeral: true });
             }
-            
             const modal = new ModalBuilder().setCustomId('modal_close_reason').setTitle('Zamykanie Ticketa');
-            const reasonInput = new TextInputBuilder()
-                .setCustomId('close_reason')
-                .setLabel("Podaj powód zamknięcia")
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(true);
-
+            const reasonInput = new TextInputBuilder().setCustomId('close_reason').setLabel("Podaj powód").setStyle(TextInputStyle.Paragraph).setRequired(true);
             modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
             await interaction.showModal(modal);
         }
     }
 
-    // --- OBSŁUGA MODALA (Finalne zamknięcie + PV) ---
+    // --- OBSŁUGA MODALA (Zamykanie + PV) ---
     if (interaction.isModalSubmit() && interaction.customId === 'modal_close_reason') {
         const reason = interaction.fields.getTextInputValue('close_reason');
         const channelName = interaction.channel.name;
 
-        // Szukamy właściciela ticketa w uprawnieniach kanału
+        // Szukanie właściciela ticketa
         const ticketOwnerEntry = interaction.channel.permissionOverwrites.cache.find(
-            overwrite => overwrite.type === 1 && overwrite.id !== interaction.guild.id && !interaction.member.roles.cache.has(overwrite.id)
+            ov => ov.type === 1 && ov.id !== interaction.guild.id && !interaction.member.roles.cache.has(ov.id)
         );
 
         const closeEmbed = new EmbedBuilder()
             .setTitle('🎫 Ticket Zamknięty - K0re SHOP')
-            .setDescription(`Twój ticket o nazwie \`${channelName}\` został zakończony.`)
+            .setDescription(`Twój ticket \`${channelName}\` został zakończony.`)
             .addFields(
-                { name: '👤 Zamknięty przez:', value: `${interaction.user.tag}`, inline: true },
+                { name: '👤 Przez:', value: `${interaction.user.tag}`, inline: true },
                 { name: '💬 Powód:', value: `\`\`\`${reason}\`\`\`` }
             )
             .setColor('#e74c3c')
-            .setTimestamp()
-            .setFooter({ text: 'Dziękujemy za skorzystanie z K0re SHOP!' });
+            .setTimestamp();
 
-        // Wysyłka na PV
         if (ticketOwnerEntry) {
             try {
                 const user = await client.users.fetch(ticketOwnerEntry.id);
                 await user.send({ embeds: [closeEmbed] });
-            } catch (err) {
-                console.log('Nie można wysłać PV (blokada DM).');
-            }
+            } catch (err) { console.log('Błąd wysyłki PV (blokada DM).'); }
         }
 
-        await interaction.reply({ content: `✅ Ticket zamknięty. Kanał zostanie usunięty za 5 sekund...` });
-        
-        setTimeout(() => {
-            interaction.channel.delete().catch(() => {});
-        }, 5000);
+        await interaction.reply({ content: `✅ Ticket zamknięty. Kanał zniknie za 5 sekund...` });
+        setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
     }
 });
 
